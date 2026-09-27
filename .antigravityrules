@@ -1,0 +1,23 @@
+# Project Rules — World Monitor Security Toolkit
+
+This project is a SEPARATE tool that assesses a locally self-hosted copy of
+World Monitor (github.com/koala73/worldmonitor), running at http://localhost:3000.
+
+Hard constraints (never violate these):
+1. This tool must NEVER send requests to the production domain worldmonitor.app
+   or api.worldmonitor.app. All target URLs are configurable via a single
+   TARGET_BASE_URL environment variable, defaulting to http://localhost:3000.
+2. Do not implement any denial-of-service, data-destructive, or brute-force
+   payloads. PoC scripts must be single-shot, read-only where possible, and
+   must only run against TARGET_BASE_URL.
+3. Findings must conform exactly to the schema in SCHEMA.md. Never add,
+   rename, or remove fields.
+4. Tech stack is fixed: React + Vite + Tailwind (frontend), Node.js + Express
+   (backend), a local JSON file at /data/findings.json for storage (no
+   external database). Do not introduce other frameworks or databases.
+5. Keep the project in two top-level folders: /server and /client.
+6. Every PoC script lives in /server/pocs/<finding-id>.js and exports a single
+   async function `run(targetBaseUrl)` returning a result object:
+   { success: boolean, evidence: string, timestamp: string }.
+7. Never fabricate finding data. If asked to "seed" findings, use only the
+   data explicitly provided in the prompt.

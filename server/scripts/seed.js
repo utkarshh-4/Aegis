@@ -1,0 +1,67 @@
+const fs = require('fs/promises');
+const path = require('path');
+
+const findingsData = [
+  {
+    "id": "WM-API-001",
+    "title": "Accepted Residual DNS-Rebinding Window in MCP Proxy SSRF Protections (Verified, Not Independently Exploited)",
+    "description": "api/mcp-proxy.ts implements strong SSRF defenses for the Pro-gated MCP proxy: hostname blocklisting, DNS-based private/reserved address rejection, cloud-metadata header stripping, single-hop redirect validation, and re-validation immediately before every outbound fetch. However, because the Vercel Edge runtime's fetch() API provides no socket-pinning capability, there is an unavoidable time-of-check-to-time-of-use (TOCTOU) gap between the proxy's DNS resolution/validation step and the actual connection made by fetch(). A DNS response that changes between these two moments (DNS rebinding) could in principle route the outbound request to an internal/private address despite passing validation. This gap is explicitly acknowledged by the development team in code comments and tracked as an accepted limitation (internal issue #5061, public draft advisory GHSA-887j-p88r-qmm9).",
+    "affectedComponent": "api/mcp-proxy.ts (function revalidateBeforeFetch / assertServerUrlSafe)",
+    "cwe": "CWE-367",
+    "cvssVector": "CVSS:3.1/AV:N/AC:H/PR:H/UI:N/S:U/C:L/I:N/A:N",
+    "cvssScore": 3.7,
+    "severity": "Low",
+    "stepsToReproduce": [
+      "Review api/mcp-proxy.ts, specifically assertServerUrlSafe() and revalidateBeforeFetch()",
+      "Observe that DNS resolution and IP validation happen via a separate DNS-over-HTTPS call (resolveDnsJson), not via the runtime's own socket connection",
+      "Observe the code comment explicitly stating the Edge runtime cannot pin the validated IP to the actual fetch() connection, and that this is an accepted, tracked limitation (#5061)",
+      "Note the endpoint requires Pro-tier authentication (resolvePremiumCallerIdentity) and per-IP rate limiting, substantially raising the bar for exploitation"
+    ],
+    "pocEvidence": "Source-code analysis of api/mcp-proxy.ts confirming the maintainer's own acknowledged residual risk; exploitation would require attacker-controlled DNS infrastructure capable of sub-second rebinding, valid Pro-tier credentials, and precise request timing — not attempted in this local assessment as it falls outside safe, authorized PoC scope.",
+    "businessImpact": "Low likelihood, low-to-moderate potential impact if achieved: a successful rebind could allow an authenticated Pro user to probe or reach internal network resources reachable from Vercel's edge network, constrained by the metadata-header-stripping mitigation already in place. The maintainer has already assessed and accepted this risk pending a Node-runtime socket-pinning fix.",
+    "remediation": "Confirm the tracked fix (issue #5061) migrating this proxy to a Node.js runtime with native socket-pinning (e.g., using Node's http.request with a resolved-IP override) to eliminate the resolve/connect gap entirely. Until then, continue current mitigations (metadata header stripping, hostname/IP blocklisting) and consider adding a secondary DNS re-check with a shorter TTL cache to narrow the exploitation window further.",
+    "disclosureStatus": "Not disclosed — this is a maintainer-acknowledged, already-public residual risk (draft advisory GHSA-887j-p88r-qmm9); independently verified via source review only, not exploited.",
+    "discoveredAt": "2026-09-27",
+    "category": "api"
+  },
+  {
+    "id": "WM-DEP-001",
+    "title": "Denial-of-Service via Infinite Loop in image-size Dependency (Malformed JXL/HEIF/ICNS Parsing)",
+    "description": "The application depends transitively (deck.gl -> @loaders.gl/textures -> texture-compressor -> image-size, versions 0.6.3-2.0.2) on a vulnerable version of the image-size npm package. Two published advisories (GHSA-5p2g-fcmc-qvqq, GHSA-w3rx-r6r6-pgpr) confirm that parsing a specially crafted JXL, HEIF, or ICNS image causes the parser to enter an infinite loop, exhausting CPU and hanging the process/tab that parses it.",
+    "affectedComponent": "node_modules/image-size (via @deck.gl/geo-layers, @deck.gl/mesh-layers, @loaders.gl/textures, @loaders.gl/gltf — used by DeckGLMap texture/mesh rendering)",
+    "cwe": "CWE-835",
+    "cvssVector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:N/I:N/A:L",
+    "cvssScore": 5.3,
+    "severity": "Medium",
+    "stepsToReproduce": [
+      "Run `npm audit` in the World Monitor repository root",
+      "Observe image-size 0.6.3-2.0.2 flagged high severity via GHSA-5p2g-fcmc-qvqq and GHSA-w3rx-r6r6-pgpr",
+      "Confirm the dependency chain reaches client-side map rendering code (@deck.gl/geo-layers, @deck.gl/mesh-layers) via `npm ls image-size`",
+      "(If reachable) supply a malformed JXL/HEIF/ICNS asset as a map texture/mesh source and observe the browser tab hang"
+    ],
+    "pocEvidence": "npm audit output (audit-report.txt) confirming image-size@0.6.3-2.0.2 present in the dependency tree via deck.gl's texture-loading chain; see GHSA-5p2g-fcmc-qvqq and GHSA-w3rx-r6r6-pgpr for the upstream infinite-loop proof-of-concept.",
+    "businessImpact": "If reachable from untrusted/upstream data (map textures, 3D assets), an attacker who can influence a rendered asset could freeze or crash a user's browser tab, degrading availability of the real-time monitoring dashboard for that session. No confidentiality or integrity impact.",
+    "remediation": "Run `npm audit fix --force` to upgrade to a patched deck.gl/image-size chain, noting this is a breaking change requiring regression testing of map rendering. Alternatively, pin a patched image-size version via npm overrides if the deck.gl major-version upgrade is not immediately feasible.",
+    "disclosureStatus": "Local test-bed only — dependency-level finding confirmed via public npm audit database; not independently exploited against production",
+    "discoveredAt": "2026-09-27",
+    "category": "input-validation"
+  }
+];
+
+async function seed() {
+  try {
+    const dataFile = path.join(__dirname, '..', 'data', 'findings.json');
+    // Ensure the data directory exists
+    await fs.mkdir(path.dirname(dataFile), { recursive: true });
+    
+    // Write exactly the findings_data array, formatting nicely with 2 spaces
+    await fs.writeFile(dataFile, JSON.stringify(findingsData, null, 2), 'utf8');
+    
+    console.log('Successfully seeded findings.json with verified findings.');
+  } catch (err) {
+    console.error('Failed to seed findings.json:', err);
+    process.exit(1);
+  }
+}
+
+seed();
