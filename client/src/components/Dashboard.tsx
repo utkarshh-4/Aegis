@@ -60,7 +60,28 @@ export default function Dashboard() {
   const [selectedFinding, setSelectedFinding] = useState<Finding | null>(null);
   const [isRunningPoc, setIsRunningPoc] = useState<boolean>(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'warning' } | null>(null);
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState(() => {
+    const hash = window.location.hash;
+    return hash.startsWith('#dashboard/') ? hash.split('/')[1] : 'overview';
+  });
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash;
+      if (hash.startsWith('#dashboard/')) {
+        setActiveTab(hash.split('/')[1]);
+      } else if (hash === '#dashboard') {
+        setActiveTab('overview');
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  const changeTab = (tab: string) => {
+    window.location.hash = `#dashboard/${tab}`;
+    setActiveTab(tab);
+  };
 
   // Fetch target status
   useEffect(() => {
@@ -122,7 +143,7 @@ export default function Dashboard() {
   };
 
   const exportReport = () => {
-    window.open('http://localhost:4000/api/report', '_blank');
+    window.location.assign('http://localhost:4000/api/report');
   };
 
   const severityCounts = {
@@ -167,16 +188,16 @@ export default function Dashboard() {
         {/* Left Sidebar */}
         <aside className="w-64 bg-[#FFFFFF] border-r border-[#E2E8F0] flex flex-col py-6 shrink-0 z-0">
           <nav className="space-y-1 px-3">
-            <NavItem icon={<LayoutDashboard className="w-4 h-4" />} label="Overview" active={activeTab === 'overview'} onClick={() => setActiveTab('overview')} />
-            <NavItem icon={<Target className="w-4 h-4" />} label="Attack Surface" active={activeTab === 'surface'} onClick={() => setActiveTab('surface')} />
-            <NavItem icon={<ClipboardList className="w-4 h-4" />} label="Assessments" active={activeTab === 'assessments'} onClick={() => setActiveTab('assessments')} />
-            <NavItem icon={<AlertTriangle className="w-4 h-4" />} label="Findings" active={activeTab === 'findings'} onClick={() => setActiveTab('findings')} />
-            <NavItem icon={<Terminal className="w-4 h-4" />} label="Evidence" active={activeTab === 'evidence'} onClick={() => setActiveTab('evidence')} />
-            <NavItem icon={<FileText className="w-4 h-4" />} label="Reports" active={activeTab === 'reports'} onClick={() => setActiveTab('reports')} />
-            <NavItem icon={<BookOpen className="w-4 h-4" />} label="Methodology" active={activeTab === 'methodology'} onClick={() => setActiveTab('methodology')} />
+            <NavItem icon={<LayoutDashboard className="w-4 h-4" />} label="Overview" active={activeTab === 'overview'} onClick={() => changeTab('overview')} />
+            <NavItem icon={<Target className="w-4 h-4" />} label="Attack Surface" active={activeTab === 'surface'} onClick={() => changeTab('surface')} />
+            <NavItem icon={<ClipboardList className="w-4 h-4" />} label="Assessments" active={activeTab === 'assessments'} onClick={() => changeTab('assessments')} />
+            <NavItem icon={<AlertTriangle className="w-4 h-4" />} label="Findings" active={activeTab === 'findings'} onClick={() => changeTab('findings')} />
+            <NavItem icon={<Terminal className="w-4 h-4" />} label="Evidence" active={activeTab === 'evidence'} onClick={() => changeTab('evidence')} />
+            <NavItem icon={<FileText className="w-4 h-4" />} label="Reports" active={activeTab === 'reports'} onClick={() => changeTab('reports')} />
+            <NavItem icon={<BookOpen className="w-4 h-4" />} label="Methodology" active={activeTab === 'methodology'} onClick={() => changeTab('methodology')} />
           </nav>
           <div className="mt-auto px-3">
-            <NavItem icon={<Settings className="w-4 h-4" />} label="Settings" active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} />
+            <NavItem icon={<Settings className="w-4 h-4" />} label="Settings" active={activeTab === 'settings'} onClick={() => changeTab('settings')} />
           </div>
         </aside>
 

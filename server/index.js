@@ -209,9 +209,17 @@ app.get('/api/report', async (req, res) => {
     pre { background: #f4f4f4; padding: 15px; border-radius: 5px; overflow-x: auto; font-family: monospace; font-size: 0.9em; white-space: pre-wrap; word-wrap: break-word; }
     ol { margin: 0; padding-left: 20px; }
     li { margin-bottom: 5px; }
+    .toolbar { position: sticky; top: 0; background: #fff; padding: 15px 20px; border-bottom: 1px solid #ccc; display: flex; justify-content: space-between; box-shadow: 0 2px 4px rgba(0,0,0,0.05); z-index: 100; }
+    .btn { padding: 8px 16px; border-radius: 4px; border: 1px solid #ccc; background: #fff; font-family: sans-serif; cursor: pointer; font-size: 14px; }
+    .btn-primary { background: #1D4ED8; color: #fff; border-color: #1D4ED8; }
+    @media print { .toolbar { display: none !important; } .cover-page { margin-top: 0; } }
   </style>
 </head>
 <body>
+  <div class="toolbar">
+    <button class="btn" onclick="window.history.length > 1 ? window.history.back() : window.close()">← Go Back</button>
+    <button class="btn btn-primary" onclick="window.print()">Download PDF</button>
+  </div>
   <div class="cover-page">
     <h1>World Monitor Security Assessment Report</h1>
     <h2>Generated on ${new Date().toLocaleDateString()}</h2>
