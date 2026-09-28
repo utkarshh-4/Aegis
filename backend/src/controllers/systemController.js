@@ -216,7 +216,13 @@ exports.getReport = async (req, res) => {
       </div>`;
     });
     
-    html += `</div></body></html>`;
+    html += `
+      <script>
+        if (new URLSearchParams(window.location.search).get('download') === 'true') {
+          window.onload = () => window.print();
+        }
+      </script>
+    </div></body></html>`;
     res.setHeader('Content-Type', 'text/html');
     res.send(html);
   } catch (err) {
