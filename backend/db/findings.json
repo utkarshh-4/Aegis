@@ -1,0 +1,34 @@
+[
+  {
+    "id": "WM-API-432",
+    "title": "Unauthenticated API Access on Admin Endpoint",
+    "description": "The /api/admin/users endpoint allows access without a valid authentication token. Any user can view PII of all registered users.",
+    "affectedComponent": "/api/admin/users",
+    "cwe": "CWE-285",
+    "cvssScore": 8.5,
+    "severity": "High",
+    "category": "Authentication",
+    "stepsToReproduce": ["Send GET request to /api/admin/users", "Observe JSON response containing user PII"],
+    "pocEvidence": "HTTP/1.1 200 OK\\nContent-Type: application/json\\n\\n[{\"id\": 1, \"name\": \"Admin\", \"email\": \"admin@worldmonitor.local\"}]",
+    "lastPocRunAt": "2026-09-28T12:00:00.000Z",
+    "lastPocSuccess": true,
+    "businessImpact": "Compromise of user data, potential regulatory fines.",
+    "remediation": "Implement token validation middleware on all /api/admin routes."
+  },
+  {
+    "id": "WM-WEB-105",
+    "title": "Cross-Site Scripting (XSS) in Dashboard Search",
+    "description": "The search parameter on the dashboard is reflected in the DOM without sanitization, allowing arbitrary script execution.",
+    "affectedComponent": "Dashboard Search Input",
+    "cwe": "CWE-79",
+    "cvssScore": 6.1,
+    "severity": "Medium",
+    "category": "Input Validation",
+    "stepsToReproduce": ["Enter <script>alert(1)</script> in search"],
+    "pocEvidence": null,
+    "lastPocRunAt": null,
+    "lastPocSuccess": false,
+    "businessImpact": "Session hijacking, unauthorized actions on behalf of the user.",
+    "remediation": "Use context-aware output encoding or a safe UI framework like React without dangerouslySetInnerHTML."
+  }
+]

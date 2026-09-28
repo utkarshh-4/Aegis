@@ -224,54 +224,54 @@ export default function AttackSurfaceView() {
   return (
     <div className="space-y-6 max-w-screen-2xl mx-auto h-full flex flex-col">
       {/* Header */}
-      <div className="bg-[#FFFFFF] border border-[#E2E8F0] rounded-md p-5 shadow-sm shrink-0">
-        <h1 className="text-2xl font-bold text-[#0F172A] mb-1">Attack Surface</h1>
-        <p className="text-sm text-[#64748B]">Discovered application components, endpoints, interfaces, and trust boundaries.</p>
+      <div className=" p-5  shrink-0">
+        <h1 className="text-2xl font-bold text-textMain mb-1">Attack Surface</h1>
+        <p className="text-sm text-textMuted">Discovered application components, endpoints, interfaces, and trust boundaries.</p>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-6 flex-1 min-h-0">
+      <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
         
         {/* Left: Tree Visualization */}
-        <div className="lg:w-1/3 bg-[#FFFFFF] border border-[#E2E8F0] rounded-md shadow-sm overflow-y-auto flex flex-col">
-          <div className="px-4 py-3 border-b border-[#E2E8F0] bg-[#F1F5F9]/30 shrink-0">
-            <h3 className="text-xs font-bold text-[#64748B] uppercase tracking-wider">Architecture Hierarchy</h3>
+        <div className="lg:w-1/3   overflow-y-auto flex flex-col">
+          <div className="px-4 py-3 border-b border-border bg-background/30 shrink-0">
+            <h3 className="text-xs font-bold text-textMuted uppercase tracking-wider">Architecture Hierarchy</h3>
           </div>
           <div className="p-4 flex-1">
-            <div className="font-mono text-sm text-[#0F172A]">
+            <div className="font-mono text-sm text-textMain">
               <TreeNode node={attackSurfaceData} selectedNode={selectedNode} onSelect={setSelectedNode} />
             </div>
           </div>
         </div>
 
         {/* Right: Selected Node Details */}
-        <div className="flex-1 bg-[#FFFFFF] border border-[#E2E8F0] rounded-md shadow-sm flex flex-col overflow-y-auto">
-          <div className="px-5 py-4 border-b border-[#E2E8F0] shrink-0">
-            <h3 className="text-xs font-bold text-[#64748B] uppercase tracking-wider mb-2">Component Analysis</h3>
+        <div className="flex-1   flex flex-col overflow-y-auto">
+          <div className="px-5 py-4 border-b border-border shrink-0">
+            <h3 className="text-xs font-bold text-textMuted uppercase tracking-wider mb-2">Component Analysis</h3>
             <div className="flex items-center space-x-3">
-              <span className="text-[#1D4ED8]">{selectedNode?.icon || <Box className="w-5 h-5" />}</span>
-              <h2 className="text-lg font-semibold text-[#0F172A]">{selectedNode?.label || 'Select a component'}</h2>
+              <span className="text-primary">{selectedNode?.icon || <Box className="w-5 h-5" />}</span>
+              <h2 className="text-lg font-semibold text-textMain">{selectedNode?.label || 'Select a component'}</h2>
             </div>
           </div>
           
-          <div className="p-6 flex-1">
+          <div className="p-4 flex-1">
             {!selectedNode?.details ? (
-              <div className="flex flex-col items-center justify-center h-full text-[#64748B] space-y-3 opacity-60">
+              <div className="flex flex-col items-center justify-center h-full text-textMuted space-y-3 opacity-60">
                 <Info className="w-8 h-8" />
                 <p className="text-sm">Select a specific leaf component to view detailed architecture mapping.</p>
               </div>
             ) : (
               <div className="space-y-8">
                 
-                <div className="grid grid-cols-2 gap-6">
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <span className="text-[10px] uppercase tracking-wider text-[#64748B] font-bold">Component</span>
-                    <div className="text-sm text-[#0F172A] font-mono p-2.5 bg-[#F7F8FA] border border-[#E2E8F0] rounded">
+                    <span className="text-[10px] uppercase tracking-wider text-textMuted font-bold">Component</span>
+                    <div className="text-sm text-textMain font-mono p-2.5 bg-background border border-border rounded">
                       {selectedNode.details.component}
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <span className="text-[10px] uppercase tracking-wider text-[#64748B] font-bold">Technology</span>
-                    <div className="text-sm text-[#0F172A] font-mono p-2.5 bg-[#F7F8FA] border border-[#E2E8F0] rounded">
+                    <span className="text-[10px] uppercase tracking-wider text-textMuted font-bold">Technology</span>
+                    <div className="text-sm text-textMain font-mono p-2.5 bg-background border border-border rounded">
                       {selectedNode.details.technology}
                     </div>
                   </div>
@@ -279,8 +279,8 @@ export default function AttackSurfaceView() {
 
                 {selectedNode.details.endpoint && (
                   <div className="space-y-1">
-                    <span className="text-[10px] uppercase tracking-wider text-[#64748B] font-bold">Exposed Endpoint</span>
-                    <div className="text-sm text-[#0F172A] font-mono p-2.5 bg-[#F7F8FA] border border-[#E2E8F0] rounded flex items-center text-[#1D4ED8]">
+                    <span className="text-[10px] uppercase tracking-wider text-textMuted font-bold">Exposed Endpoint</span>
+                    <div className="text-sm text-textMain font-mono p-2.5 bg-background border border-border rounded flex items-center text-primary">
                       <Server className="w-3.5 h-3.5 mr-2" />
                       {selectedNode.details.endpoint}
                     </div>
@@ -288,11 +288,11 @@ export default function AttackSurfaceView() {
                 )}
 
                 <div className="space-y-3">
-                  <span className="text-[10px] uppercase tracking-wider text-[#64748B] font-bold">Security Checks Executed</span>
+                  <span className="text-[10px] uppercase tracking-wider text-textMuted font-bold">Security Checks Executed</span>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {selectedNode.details.securityChecks.map((check, idx) => (
-                      <div key={idx} className="flex items-center space-x-2 text-sm text-[#0F172A] p-2 bg-[#F7F8FA] border border-[#E2E8F0] rounded">
-                        <Lock className="w-3.5 h-3.5 text-[#64748B]" />
+                      <div key={idx} className="flex items-center space-x-2 text-sm text-textMain p-2 bg-background border border-border rounded">
+                        <Lock className="w-3.5 h-3.5 text-textMuted" />
                         <span>{check}</span>
                         <CheckCircle2 className="w-3.5 h-3.5 text-[#15803D] ml-auto" />
                       </div>
@@ -301,19 +301,19 @@ export default function AttackSurfaceView() {
                 </div>
 
                 <div className="space-y-3">
-                  <span className="text-[10px] uppercase tracking-wider text-[#64748B] font-bold">Related Findings</span>
+                  <span className="text-[10px] uppercase tracking-wider text-textMuted font-bold">Related Findings</span>
                   {selectedNode.details.relatedFindings.length > 0 ? (
                     <div className="space-y-2">
                       {selectedNode.details.relatedFindings.map((findingId, idx) => (
-                        <div key={idx} className="flex items-center space-x-3 text-sm p-3 bg-[#F7F8FA] border border-[#E2E8F0] rounded border-l-2 border-l-[#F59E0B]">
+                        <div key={idx} className="flex items-center space-x-3 text-sm p-3 bg-background border border-border rounded border-l-2 border-l-[#F59E0B]">
                           <AlertTriangle className="w-4 h-4 text-[#B45309]" />
-                          <span className="font-mono text-[#0F172A]">{findingId}</span>
-                          <span className="text-[#64748B] text-xs">Vulnerability confirmed during assessment.</span>
+                          <span className="font-mono text-textMain">{findingId}</span>
+                          <span className="text-textMuted text-xs">Vulnerability confirmed during assessment.</span>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div className="flex items-center text-sm text-[#64748B] p-3 bg-[#F7F8FA] border border-[#E2E8F0] rounded border-l-2 border-l-[#22C55E]">
+                    <div className="flex items-center text-sm text-textMuted p-3 bg-background border border-border rounded border-l-2 border-l-[#22C55E]">
                       <CheckCircle2 className="w-4 h-4 mr-2 text-[#15803D]" />
                       No verified vulnerabilities found in this component.
                     </div>
@@ -352,7 +352,7 @@ function TreeNode({
     <div className="relative">
       <div 
         className={`flex items-center py-1.5 px-2 cursor-pointer transition-colors rounded group ${
-          isSelected ? 'bg-[#F1F5F9] text-[#1D4ED8]' : 'text-[#64748B] hover:text-[#0F172A] hover:bg-[#F1F5F9]/50'
+          isSelected ? 'bg-background text-primary' : 'text-textMuted hover:text-textMain hover:bg-background/50'
         }`}
         style={{ paddingLeft: `${level * 24 + 8}px` }}
         onClick={() => {
@@ -371,12 +371,12 @@ function TreeNode({
         
         {/* Node Label & Icon */}
         <div className="flex items-center space-x-2">
-          {node.icon && <span className={isSelected ? 'text-[#1D4ED8]' : 'text-[#64748B]'}>{node.icon}</span>}
+          {node.icon && <span className={isSelected ? 'text-primary' : 'text-textMuted'}>{node.icon}</span>}
           <span className={`${isRoot ? 'font-bold' : ''} ${isSelected ? 'font-semibold' : ''}`}>{node.label}</span>
           
           {/* Related Findings Indicator */}
           {node.details?.relatedFindings && node.details.relatedFindings.length > 0 && (
-            <span className="w-2 h-2 rounded-full bg-[#B45309] ml-2" aria-hidden="true" title="Contains findings" />
+            <span className="w-2 h-2 rounded bg-[#B45309] ml-2" aria-hidden="true" title="Contains findings" />
           )}
         </div>
       </div>
@@ -387,7 +387,7 @@ function TreeNode({
           {/* Subtle vertical line for hierarchy */}
           {level > 0 && (
              <div 
-               className="absolute top-7 bottom-2 border-l border-[#E2E8F0]" 
+               className="absolute top-7 bottom-2 border-l border-border" 
                style={{ left: `${level * 24 + 13}px` }} 
              />
           )}
