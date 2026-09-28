@@ -144,7 +144,7 @@ app.post('/api/findings/:id/run-poc', async (req, res) => {
 // Check target status
 app.get('/api/target-status', async (req, res) => {
   try {
-    const targetBaseUrl = process.env.TARGET_BASE_URL.trim();
+    const targetBaseUrl = TARGET_BASE_URL;
     // Use an AbortController to set a short timeout for the ping
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
@@ -159,7 +159,7 @@ app.get('/api/target-status', async (req, res) => {
     clearTimeout(timeout);
     res.json({ reachable: true, targetBaseUrl });
   } catch (err) {
-    res.json({ reachable: false, targetBaseUrl: process.env.TARGET_BASE_URL.trim() });
+    res.json({ reachable: false, targetBaseUrl: TARGET_BASE_URL });
   }
 });
 
