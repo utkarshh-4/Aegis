@@ -459,17 +459,20 @@ export default function Dashboard() {
 // Subcomponents
 
 function NavItem({ icon, label, active, onClick, isSidebarOpen }: { icon: React.ReactNode, label: string, active?: boolean, onClick?: () => void, isSidebarOpen?: boolean }) {
+  const isSpecial = label === 'Reports';
   return (
     <button 
       onClick={onClick}
-      className={`w-full flex items-center p-2 rounded text-xs font-semibold tracking-wide transition-colors ${
+      className={`w-full flex items-center p-2 rounded text-xs font-semibold tracking-wide transition-all duration-300 ${
         active 
-          ? 'bg-background text-textMain' 
-          : 'text-textMuted hover:bg-background hover:text-textMain'
+          ? 'bg-primary/10 text-primary border-l-2 border-primary shadow-sm' 
+          : isSpecial
+            ? 'bg-gradient-to-r from-amber-500/10 to-transparent text-amber-600 border-l-2 border-amber-500/40 hover:from-amber-500/20 hover:border-amber-500/60'
+            : 'text-textMuted hover:bg-background hover:text-textMain border-l-2 border-transparent'
       }`}
       title={!isSidebarOpen ? label : undefined}
     >
-      <div className="shrink-0 flex items-center justify-center w-6 h-6">{icon}</div>
+      <div className={`shrink-0 flex items-center justify-center w-6 h-6 ${isSpecial && !active ? 'text-amber-500 animate-pulse' : ''}`}>{icon}</div>
       <span className={`whitespace-nowrap overflow-hidden transition-all duration-300 ease-in-out ${isSidebarOpen ? 'ml-3 opacity-100 max-w-[200px]' : 'ml-0 opacity-0 max-w-0'}`}>
         {label}
       </span>

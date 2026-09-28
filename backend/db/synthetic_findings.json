@@ -1,0 +1,81 @@
+[
+  {
+    "id": "WM-API-001",
+    "title": "SQL Injection in User Authentication Endpoint",
+    "description": "The `/api/v1/auth/login` endpoint is vulnerable to time-based blind SQL injection. User-supplied input in the `username` parameter is directly interpolated into a database query without parameterization, allowing an attacker to execute arbitrary SQL commands.",
+    "affectedComponent": "api/v1/auth/login",
+    "cwe": "CWE-89",
+    "cvssVector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+    "cvssScore": 9.8,
+    "severity": "Critical",
+    "stepsToReproduce": [
+      "Navigate to the login endpoint.",
+      "Send a POST request with the username set to `admin' OR SLEEP(5)--`.",
+      "Observe that the server response takes approximately 5 seconds longer than a normal request."
+    ],
+    "pocEvidence": "POST /api/v1/auth/login HTTP/1.1\nHost: target.local\n\n{\"username\": \"admin' OR SLEEP(5)--\", \"password\": \"test\"}\n\n// Response Time: 5042ms",
+    "businessImpact": "An attacker could bypass authentication, extract sensitive user data, modify records, or potentially take full control of the backend database, resulting in a complete compromise of confidentiality, integrity, and availability.",
+    "remediation": "Use parameterized queries (Prepared Statements) or an Object-Relational Mapping (ORM) framework for all database interactions. Ensure input validation and sanitization are applied.",
+    "disclosureStatus": "Not Disclosed",
+    "discoveredAt": "2026-09-29T10:00:00Z",
+    "category": "Injection",
+    "lastPocSuccess": true,
+    "lastPocRunAt": "2026-09-29T10:05:00Z"
+  },
+  {
+    "id": "WM-API-002",
+    "title": "Server-Side Request Forgery (SSRF) in Image Fetcher",
+    "description": "The application features a 'fetch profile picture from URL' function at `/api/v1/users/profile-image` which does not validate the domain or IP address of the target URL. This allows an attacker to make the server issue requests on their behalf, potentially accessing internal cloud metadata endpoints or internal network services.",
+    "affectedComponent": "api/v1/users/profile-image",
+    "cwe": "CWE-918",
+    "cvssVector": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:C/C:H/I:L/A:N",
+    "cvssScore": 8.5,
+    "severity": "High",
+    "stepsToReproduce": [
+      "Log in as a standard user.",
+      "Submit a request to update the profile picture.",
+      "Provide the URL `http://169.254.169.254/latest/meta-data/`.",
+      "Observe that the server returns the AWS metadata response."
+    ],
+    "pocEvidence": "POST /api/v1/users/profile-image HTTP/1.1\n\n{\"url\": \"http://169.254.169.254/latest/meta-data/\"}\n\nHTTP/1.1 200 OK\nami-id\niam/security-credentials/...",
+    "businessImpact": "An attacker could retrieve sensitive cloud provider metadata, including temporary IAM credentials, leading to a potential cloud environment takeover.",
+    "remediation": "Implement an allowlist of trusted domains. Block requests to local, loopback, and private IP ranges (e.g., 127.0.0.1, 169.254.169.254, 10.0.0.0/8).",
+    "category": "Broken Access Control",
+    "lastPocSuccess": false
+  },
+  {
+    "id": "WM-API-003",
+    "title": "Cross-Origin Resource Sharing (CORS) Misconfiguration",
+    "description": "The API endpoint `/api/v1/user/settings` reflects the `Origin` header from incoming requests in the `Access-Control-Allow-Origin` response header, and sets `Access-Control-Allow-Credentials: true`. This allows any malicious website to read the authenticated user's settings via cross-origin requests.",
+    "affectedComponent": "api/v1/user/settings",
+    "cwe": "CWE-942",
+    "cvssVector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:L/I:N/A:N",
+    "cvssScore": 4.3,
+    "severity": "Medium",
+    "stepsToReproduce": [
+      "Send an OPTIONS request to the endpoint with `Origin: https://evil.com`.",
+      "Observe the response headers containing `Access-Control-Allow-Origin: https://evil.com`."
+    ],
+    "pocEvidence": "OPTIONS /api/v1/user/settings HTTP/1.1\nOrigin: https://evil.com\n\nHTTP/1.1 200 OK\nAccess-Control-Allow-Origin: https://evil.com\nAccess-Control-Allow-Credentials: true",
+    "businessImpact": "An attacker can trick an authenticated user into visiting a malicious site, which then reads their sensitive account settings and profile information.",
+    "remediation": "Restrict the CORS policy to explicitly trusted origins only. Do not reflect arbitrary origins from the request header.",
+    "category": "Security Misconfiguration"
+  },
+  {
+    "id": "WM-API-004",
+    "title": "Information Exposure via Server Banner",
+    "description": "The application's HTTP response headers include detailed version information about the underlying server and framework (`Server: nginx/1.22.1`, `X-Powered-By: Express`).",
+    "affectedComponent": "Global Web Server",
+    "cwe": "CWE-200",
+    "cvssScore": 2.1,
+    "severity": "Low",
+    "stepsToReproduce": [
+      "Send any request to the web server.",
+      "Inspect the response headers."
+    ],
+    "pocEvidence": "HTTP/1.1 200 OK\nServer: nginx/1.22.1\nX-Powered-By: Express\nContent-Type: application/json",
+    "businessImpact": "Exposes technology stack details to potential attackers, allowing them to quickly search for known vulnerabilities in those specific versions.",
+    "remediation": "Remove or obscure the `Server` and `X-Powered-By` headers in the web server configuration.",
+    "category": "Information Disclosure"
+  }
+]
