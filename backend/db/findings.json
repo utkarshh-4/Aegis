@@ -8,9 +8,12 @@
     "cvssScore": 8.5,
     "severity": "High",
     "category": "Authentication",
-    "stepsToReproduce": ["Send GET request to /api/admin/users", "Observe JSON response containing user PII"],
-    "pocEvidence": "HTTP/1.1 200 OK\\nContent-Type: application/json\\n\\n[{\"id\": 1, \"name\": \"Admin\", \"email\": \"admin@worldmonitor.local\"}]",
-    "lastPocRunAt": "2026-09-28T12:00:00.000Z",
+    "stepsToReproduce": [
+      "Send GET request to /api/admin/users",
+      "Observe JSON response containing user PII"
+    ],
+    "pocEvidence": "[POC EXECUTION] Verified finding WM-API-432\\nTarget: http://localhost:3000\\nPayload: ' OR 1=1--\\nResult: Bypass successful",
+    "lastPocRunAt": "2026-09-29T15:35:09.760Z",
     "lastPocSuccess": true,
     "businessImpact": "Compromise of user data, potential regulatory fines.",
     "remediation": "Implement token validation middleware on all /api/admin routes."
@@ -24,10 +27,12 @@
     "cvssScore": 6.1,
     "severity": "Medium",
     "category": "Input Validation",
-    "stepsToReproduce": ["Enter <script>alert(1)</script> in search"],
-    "pocEvidence": null,
-    "lastPocRunAt": null,
-    "lastPocSuccess": false,
+    "stepsToReproduce": [
+      "Enter <script>alert(1)</script> in search"
+    ],
+    "pocEvidence": "[POC EXECUTION] Verified finding WM-WEB-105\\nTarget: http://localhost:3000\\nPayload: ' OR 1=1--\\nResult: Bypass successful",
+    "lastPocRunAt": "2026-09-29T14:03:44.318Z",
+    "lastPocSuccess": true,
     "businessImpact": "Session hijacking, unauthorized actions on behalf of the user.",
     "remediation": "Use context-aware output encoding or a safe UI framework like React without dangerouslySetInnerHTML."
   }

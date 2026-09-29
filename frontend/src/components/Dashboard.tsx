@@ -35,7 +35,8 @@ import {
   Shield,
   ChevronRight,
   Lock,
-  Menu
+  Menu,
+  Play
 } from 'lucide-react';
 
 // Types
@@ -72,6 +73,226 @@ export default function Dashboard() {
     return hash.startsWith('#dashboard/') ? hash.split('/')[1] : 'overview';
   });
 
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const generatingRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  const [demoAssessmentStarted, setDemoAssessmentStarted] = useState(false);
+  const [assessmentStatus, setAssessmentStatus] = useState<'idle' | 'running' | 'completed' | 'failed'>('idle');
+  const [assessmentLogs, setAssessmentLogs] = useState<{timestamp: string, level: string, message: string}[]>([]);
+  const [assessmentStages, setAssessmentStages] = useState({
+    'Target Setup': 'PENDING',
+    'Discovery': 'PENDING',
+    'Security Scanning': 'PENDING',
+    'Analysis': 'PENDING',
+    'Verification': 'PENDING',
+    'Report': 'PENDING'
+  });
+  const [scanners, setScanners] = useState([
+    { name: 'Semgrep', progress: 0, status: 'PENDING' },
+    { name: 'Gitleaks', progress: 0, status: 'PENDING' },
+    { name: 'Trivy', progress: 0, status: 'PENDING' },
+    { name: 'Nuclei', progress: 0, status: 'PENDING' },
+    { name: 'ZAP', progress: 0, status: 'PENDING' },
+    { name: 'Schemathesis', progress: 0, status: 'PENDING' },
+    { name: 'Playwright', progress: 0, status: 'PENDING' }
+  ]);
+  const [assessmentStartedAt, setAssessmentStartedAt] = useState<string | null>(null);
+
+  const addLog = (level: string, message: string) => {
+    setAssessmentLogs(prev => [...prev, { timestamp: new Date().toISOString(), level, message }]);
+  };
+
+  const currentRunId = React.useRef(0);
+
+  const resetDemo = () => {
+    currentRunId.current += 1;
+    setDemoAssessmentStarted(false);
+    setAssessmentStatus('idle');
+    setFindings([]);
+    setSelectedFinding(null);
+    setAssessmentStartedAt(null);
+    setAssessmentLogs([]);
+    setAssessmentStages({
+      'Target Setup': 'PENDING',
+      'Discovery': 'PENDING',
+      'Security Scanning': 'PENDING',
+      'Analysis': 'PENDING',
+      'Verification': 'PENDING',
+      'Report': 'PENDING'
+    });
+    setScanners(scanners.map(s => ({...s, progress: 0, status: 'PENDING'})));
+  };
+
+
+  const wait = (ms: number, runId: number) => 
+    new Promise((resolve, reject) => {
+      setTimeout(() => {
+        if (currentRunId.current !== runId) {
+          reject(new Error('CANCELLED'));
+        } else {
+          resolve(true);
+        }
+      }, ms);
+    });
+
+  const checkCancellation = (runId: number) => {
+    if (currentRunId.current !== runId) throw new Error('CANCELLED');
+  };
+
+  const startDemoAssessment = async () => {
+    if (assessmentStatus === 'running') return;
+    
+    const DEMO_SPEED_MULTIPLIER = 1.1;
+    
+    currentRunId.current += 1;
+    const runId = currentRunId.current;
+    
+    setDemoAssessmentStarted(true);
+    setAssessmentStatus('running');
+    setAssessmentStartedAt(new Date().toISOString());
+    setAssessmentLogs([]);
+    
+    setAssessmentStages({
+      'Target Setup': 'PENDING',
+      'Discovery': 'PENDING',
+      'Security Scanning': 'PENDING',
+      'Analysis': 'PENDING',
+      'Verification': 'PENDING',
+      'Report': 'PENDING'
+    });
+    setScanners(prev => prev.map(s => ({...s, progress: 0, status: 'PENDING'})));
+    
+    try {
+      addLog('INFO', 'Initializing synthetic security assessment...');
+      setAssessmentStages(prev => ({...prev, 'Target Setup': 'RUNNING'}));
+      
+      // Target Check with timeout
+      addLog('INFO', 'Validating target scope...');
+      const targetTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Target check timed out')), 5000));
+      const targetFetch = fetch('http://localhost:4000/api/target-status').then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      });
+      
+      await Promise.race([targetFetch, targetTimeout]);
+      checkCancellation(runId);
+      
+      addLog('INFO', `Target reachable: ${targetBaseUrl || 'http://localhost:3000'}`);
+      await wait(2500 * DEMO_SPEED_MULTIPLIER, runId);
+      addLog('INFO', 'Target setup completed.');
+      
+      setAssessmentStages(prev => ({...prev, 'Target Setup': 'COMPLETED', 'Discovery': 'RUNNING'}));
+      addLog('INFO', 'Discovery phase started.');
+      addLog('INFO', 'Mapping synthetic application surface...');
+      addLog('INFO', 'Enumerating API and client security domains...');
+      
+      await wait(3000 * DEMO_SPEED_MULTIPLIER, runId);
+      addLog('INFO', 'Discovery phase completed.');
+      
+      setAssessmentStages(prev => ({...prev, 'Discovery': 'COMPLETED', 'Security Scanning': 'RUNNING'}));
+      addLog('INFO', 'Security scanning started.');
+      
+      const generatePattern = (profile: string) => {
+        const pattern: {delta: number, delay: number}[] = [];
+        let p = 0;
+        let i = 0;
+        while (p < 100) {
+          i++;
+          const r = (i * 37) % 5; // pseudo-random 0-4
+          let delta = 3 + r; // 3 to 7
+          let delay = 70 + (r * 10); // 70 to 110ms
+          
+          if (profile === 'fast-early') {
+            if (p < 50) { delta += 3; delay -= 20; }
+            else { delta = Math.max(1, delta - 2); delay += 30; }
+          } else if (profile === 'slow-early') {
+            if (p < 50) { delta = Math.max(1, delta - 2); delay += 30; }
+            else { delta += 3; delay -= 20; }
+          } else if (profile === 'plateau') {
+            if ((p > 30 && p < 45 && i % 2 === 0) || (p > 70 && p < 85 && i % 2 === 0)) {
+              pattern.push({ delta: 0, delay: 250 * DEMO_SPEED_MULTIPLIER });
+            }
+          } else if (profile === 'slow') {
+            delta = Math.max(2, delta - 1);
+            delay += 40; // 110 to 150ms per step
+          }
+
+          if (p + delta > 100) delta = 100 - p;
+          pattern.push({ delta, delay: delay * DEMO_SPEED_MULTIPLIER });
+          p += delta;
+          
+          // occasional micro-pause
+          if (p < 100 && i % 7 === 0) {
+             pattern.push({ delta: 0, delay: 150 * DEMO_SPEED_MULTIPLIER });
+          }
+        }
+        return pattern;
+      };
+
+      const updateScanner = (name: string, progress: number, status: string) => {
+        setScanners(prev => prev.map(s => s.name === name ? { ...s, progress, status } : s));
+      };
+
+      const runScannerDemo = async (name: string, profile: string, actionLog: string) => {
+        addLog('INFO', `${name} demo stage started...`);
+        addLog('INFO', `${name} ${actionLog}`);
+        updateScanner(name, 0, 'RUNNING');
+        
+        const pattern = generatePattern(profile);
+        let currentProgress = 0;
+        
+        for (const step of pattern) {
+          await wait(step.delay, runId);
+          currentProgress += step.delta;
+          if (currentProgress > 100) currentProgress = 100;
+          updateScanner(name, currentProgress, currentProgress === 100 ? 'COMPLETED' : 'RUNNING');
+        }
+        
+        addLog('INFO', `${name} demo stage completed.`);
+      };
+
+      await runScannerDemo('Semgrep', 'fast-early', 'analyzing synthetic source...');
+      await runScannerDemo('Gitleaks', 'steady', 'scanning synthetic secrets surface...');
+      await runScannerDemo('Trivy', 'slow-early', 'evaluating synthetic dependencies...');
+      await runScannerDemo('Nuclei', 'plateau', 'executing synthetic templates...');
+      await runScannerDemo('ZAP', 'slow', 'performing synthetic dynamic testing...');
+      await runScannerDemo('Schemathesis', 'steady', 'fuzzing synthetic API endpoints...');
+      await runScannerDemo('Playwright', 'fast-early', 'testing synthetic client flows...');
+      
+      addLog('INFO', 'Security scanning completed.');
+      addLog('INFO', 'Correlating assessment observations...');
+      setAssessmentStages(prev => ({...prev, 'Security Scanning': 'COMPLETED', 'Analysis': 'RUNNING'}));
+      
+      await wait(2000 * DEMO_SPEED_MULTIPLIER, runId);
+      addLog('INFO', 'Correlation completed.');
+      addLog('INFO', 'Risk classification completed.');
+      
+      setAssessmentStages(prev => ({...prev, 'Analysis': 'COMPLETED', 'Verification': 'RUNNING'}));
+      addLog('INFO', 'Beginning verification phase...');
+      addLog('INFO', 'Reviewing synthetic security observations...');
+      
+      await wait(2500 * DEMO_SPEED_MULTIPLIER, runId);
+      addLog('INFO', 'Verification completed.');
+      
+      setAssessmentStages(prev => ({...prev, 'Verification': 'COMPLETED', 'Report': 'READY'}));
+      addLog('INFO', 'Assessment results finalized.');
+      addLog('INFO', 'Findings are now available.');
+      
+      setAssessmentStatus('completed');
+      
+    } catch (error: any) {
+      if (error.message === 'CANCELLED') {
+        console.log('[AEGIS] Assessment run cancelled.');
+        return; // exit silently if cancelled by reset
+      }
+      
+      console.error('[AEGIS] Assessment failed', error);
+      setAssessmentStatus('failed');
+      addLog('ERROR', `Demo assessment failed: ${error.message}`);
+      setToast({ message: 'Demo assessment failed to complete.', type: 'warning' });
+    }
+  };
+
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash;
@@ -82,7 +303,10 @@ export default function Dashboard() {
       }
     };
     window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+      if (generatingRef.current) clearTimeout(generatingRef.current);
+    };
   }, []);
 
   const changeTab = (tab: string) => {
@@ -121,8 +345,12 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    fetchFindings();
-  }, []);
+    if (assessmentStatus === 'completed') {
+      fetchFindings();
+    } else {
+      setFindings([]);
+    }
+  }, [assessmentStatus]);
 
   const runPoc = async (id: string) => {
     setIsRunningPoc(true);
@@ -150,7 +378,15 @@ export default function Dashboard() {
   };
 
   const exportReport = () => {
-    window.location.assign('http://localhost:4000/api/report');
+    if (isGeneratingReport) return;
+    setIsGeneratingReport(true);
+    changeTab('reports');
+    
+    if (generatingRef.current) clearTimeout(generatingRef.current);
+    generatingRef.current = setTimeout(() => {
+      setIsGeneratingReport(false);
+      generatingRef.current = null;
+    }, 1500);
   };
 
   const severityCounts = {
@@ -185,7 +421,8 @@ export default function Dashboard() {
         <div className="flex items-center space-x-6">
           <button 
             onClick={exportReport}
-            className="flex items-center space-x-2 px-3 py-1.5 bg-background hover:bg-[#E2E8F0] text-textMain border border-border rounded text-xs font-medium transition-colors"
+            disabled={isGeneratingReport}
+            className={`flex items-center space-x-2 px-3 py-1.5 ${isGeneratingReport ? 'bg-background text-textMuted cursor-not-allowed opacity-75' : 'bg-background hover:bg-[#E2E8F0] text-textMain'} border border-border rounded text-xs font-medium transition-colors`}
           >
             <Download className="w-3.5 h-3.5" />
             <span>Generate Report</span>
@@ -216,6 +453,20 @@ export default function Dashboard() {
         {/* Primary View */}
         <main className="flex-1 overflow-y-auto p-4 bg-background">
           {activeTab === 'findings' ? (
+            !demoAssessmentStarted ? (
+              <div className="flex flex-col items-center justify-center h-full text-center py-20">
+                <ShieldAlert className="w-16 h-16 text-textMuted mb-4" />
+                <h2 className="text-xl font-bold text-textMain mb-2">Assessment not started</h2>
+                <p className="text-textMuted mb-6">Start the demo assessment to begin vulnerability validation.</p>
+                <button onClick={() => changeTab('overview')} className="px-6 py-2 bg-primary text-white font-bold rounded">Go to Overview</button>
+              </div>
+            ) : assessmentStatus === 'running' ? (
+              <div className="flex flex-col items-center justify-center h-full text-center py-20">
+                <Loader2 className="w-16 h-16 text-primary animate-spin mb-4" />
+                <h2 className="text-xl font-bold text-textMain mb-2">Assessment in progress</h2>
+                <p className="text-textMuted mb-6">Findings will appear when scanning and verification are complete.</p>
+              </div>
+            ) : (
             <FindingsView 
               findings={findings}
               selectedFinding={selectedFinding}
@@ -224,217 +475,181 @@ export default function Dashboard() {
               isRunningPoc={isRunningPoc}
               targetBaseUrl={targetBaseUrl}
             />
+            )
           ) : activeTab === 'surface' ? (
             <AttackSurfaceView />
           ) : activeTab === 'reports' ? (
-            <ReportView />
+            !demoAssessmentStarted ? (
+              <div className="flex flex-col items-center justify-center h-full text-center py-20">
+                <FileText className="w-16 h-16 text-textMuted mb-4" />
+                <h2 className="text-xl font-bold text-textMain mb-2">Assessment Not Started</h2>
+                <p className="text-textMuted mb-6">Start the demo assessment to generate assessment findings and report.</p>
+              </div>
+            ) : assessmentStatus === 'running' ? (
+              <div className="flex flex-col items-center justify-center h-full text-center py-20">
+                <Loader2 className="w-16 h-16 text-primary animate-spin mb-4" />
+                <h2 className="text-xl font-bold text-textMain mb-2">Assessment in progress</h2>
+                <p className="text-textMuted mb-6">Report generation will be available when scanning is complete.</p>
+              </div>
+            ) : (
+            <ReportView isGeneratingReport={isGeneratingReport} />
+            )
           ) : activeTab === 'evidence' ? (
+            !demoAssessmentStarted ? (
+              <div className="flex flex-col items-center justify-center h-full text-center py-20">
+                <Terminal className="w-16 h-16 text-textMuted mb-4" />
+                <h2 className="text-xl font-bold text-textMain mb-2">No evidence collected yet</h2>
+                <p className="text-textMuted mb-6">Start the demo assessment and run PoCs to generate evidence.</p>
+              </div>
+            ) : assessmentStatus === 'running' ? (
+              <div className="flex flex-col items-center justify-center h-full text-center py-20">
+                <Loader2 className="w-16 h-16 text-primary animate-spin mb-4" />
+                <h2 className="text-xl font-bold text-textMain mb-2">Assessment in progress</h2>
+                <p className="text-textMuted mb-6">Run PoCs on discovered findings to generate evidence.</p>
+              </div>
+            ) : (
             <EvidenceView />
+            )
           ) : activeTab === 'assessments' ? (
-            <AssessmentsView />
+            <AssessmentsView onAssessmentCreated={(id) => { 
+                setDemoAssessmentStarted(true); 
+                changeTab('overview'); 
+                startDemoAssessment(); 
+            }} />
           ) : activeTab === 'methodology' ? (
             <MethodologyView />
           ) : (
+          
           <div className="max-w-screen-2xl mx-auto space-y-6">
-            
-            {/* Meta Header */}
-            <div className="bg-surface border border-border rounded p-6 flex flex-col md:flex-row md:items-start justify-between gap-4">
-              <div className="space-y-1">
-                <div className="flex items-center space-x-3 pb-2">
-                   <span className="text-xl font-bold tracking-tight text-textMain">Assessment Overview</span>
-                  <div className="px-2 py-0.5 bg-background border border-blue-500/30 text-blue-400 text-[10px] font-bold uppercase tracking-wider rounded">
-                    LOCAL TEST ENVIRONMENT
+            <div className="bg-surface border border-border rounded p-6">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-textMuted pb-6 flex items-center">Assessment Progress</h2>
+              <div className="flex items-center justify-between relative overflow-x-auto pb-2">
+                <div className="absolute left-[5%] right-[5%] top-4 h-0.5 bg-background -z-0 min-w-[600px]"></div>
+                {Object.entries(assessmentStages).map(([stage, status], idx, arr) => (
+                  <div key={stage} className="relative z-10 flex flex-col items-center flex-1 min-w-[100px]">
+                    <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center bg-surface transition-colors ${
+                      status === 'COMPLETED' || status === 'READY' ? 'border-green-500 text-green-500' : 
+                      status === 'RUNNING' ? 'border-primary text-primary bg-primary/10' : 
+                      'border-border text-textMuted'
+                    }`}>
+                      {status === 'COMPLETED' || status === 'READY' ? <CheckCircle2 className="w-5 h-5" /> : status === 'RUNNING' ? <Loader2 className="w-5 h-5 animate-spin" /> : <div className="w-2 h-2 rounded-full bg-border"></div>}
+                    </div>
+                    <span className={`mt-3 text-xs font-bold uppercase tracking-wider ${
+                      status === 'COMPLETED' || status === 'READY' ? 'text-textMain' : 
+                      status === 'RUNNING' ? 'text-primary' : 
+                      'text-textMuted'
+                    }`}>{stage}</span>
+                    <span className="text-[9px] text-textMuted mt-0.5">{status}</span>
                   </div>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-x-12 gap-y-2 text-xs">
-                  <div className="flex flex-col"><span className="text-textMuted font-medium uppercase tracking-wider mb-0.5">Target</span><span className="font-mono text-textMain">{targetBaseUrl || 'worldmonitor.local'}</span></div>
-                  <div className="flex flex-col"><span className="text-textMuted font-medium uppercase tracking-wider mb-0.5">Assessment ID</span><span className="font-mono text-textMain">WM-SA-2026-09</span></div>
-                  <div className="flex flex-col"><span className="text-textMuted font-medium uppercase tracking-wider mb-0.5">Commit SHA</span><span className="font-mono text-textMain">a1b2c3d</span></div>
-                  <div className="flex flex-col"><span className="text-textMuted font-medium uppercase tracking-wider mb-0.5">Environment</span><span className="text-textMain">Local / Sandbox</span></div>
-                  <div className="flex flex-col"><span className="text-textMuted font-medium uppercase tracking-wider mb-0.5">Last Scan</span><span className="text-textMain">{new Date().toISOString().split('T')[0]} 00:00 UTC</span></div>
-                  <div className="flex flex-col"><span className="text-textMuted font-medium uppercase tracking-wider mb-0.5">Status</span>
-                    <span className="flex items-center text-[#15803D] font-medium"><Radio className="w-3 h-3 mr-1" /> Active</span>
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
-
-            {/* TOP KPI ROW */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              <KPICard label="Total Findings" count={totalFindings} trend="+2" />
-              <KPICard label="Critical" count={severityCounts.Critical} trend="0" />
-              <KPICard label="High" count={severityCounts.High} trend="+1" />
-              <KPICard label="Medium" count={severityCounts.Medium} trend="+1" />
-              <KPICard label="Low" count={severityCounts.Low} trend="0" />
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              
-              {/* Left Column (2/3 width on LG) */}
-              <div className="lg:col-span-2 space-y-6">
-                
-                {/* SCAN PIPELINE */}
-                <div className="bg-surface border border-border rounded p-5">
-                  <h2 className="text-sm font-semibold uppercase tracking-wider text-textMuted pb-4 flex items-center"><Activity className="w-4 h-4 mr-2"/> Scan Pipeline Execution</h2>
-                  <div className="flex items-start justify-between w-full overflow-x-auto custom-scrollbar pb-2">
-                    <PipelineStep label="Scope" status="done" count={0} duration="2s" />
-                    <ChevronRight className="w-4 h-4 text-textMuted mt-3 shrink-0" />
-                    <PipelineStep label="Recon" status="done" count={0} duration="14s" />
-                    <ChevronRight className="w-4 h-4 text-textMuted mt-3 shrink-0" />
-                    <PipelineStep label="SAST" status="done" count={0} duration="45s" />
-                    <ChevronRight className="w-4 h-4 text-textMuted mt-3 shrink-0" />
-                    <PipelineStep label="Secrets" status="done" count={0} duration="11s" />
-                    <ChevronRight className="w-4 h-4 text-textMuted mt-3 shrink-0" />
-                    <PipelineStep label="Deps" status="done" count={1} duration="8s" />
-                    <ChevronRight className="w-4 h-4 text-textMuted mt-3 shrink-0" />
-                    <PipelineStep label="DAST" status="active" count={0} duration="running" />
-                    <ChevronRight className="w-4 h-4 text-textMuted mt-3 shrink-0" />
-                    <PipelineStep label="API Sec" status="done" count={1} duration="32s" />
-                    <ChevronRight className="w-4 h-4 text-textMuted mt-3 shrink-0" />
-                    <PipelineStep label="Correlation" status="pending" count={0} />
-                    <ChevronRight className="w-4 h-4 text-textMuted mt-3 shrink-0" />
-                    <PipelineStep label="Risk" status="pending" count={0} />
-                    <ChevronRight className="w-4 h-4 text-textMuted mt-3 shrink-0" />
-                    <PipelineStep label="Report" status="pending" count={0} />
+            
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+              <div className="space-y-6">
+                <div className="bg-surface border border-border rounded p-5 flex flex-col">
+                  <h2 className="text-sm font-semibold uppercase tracking-wider text-textMuted pb-4 flex items-center">Assessment Overview</h2>
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
+                    <div className="relative flex items-center justify-center">
+                      <DonutChart critical={severityCounts.Critical} high={severityCounts.High} medium={severityCounts.Medium} low={severityCounts.Low} />
+                      <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <span className="text-2xl font-bold text-textMain leading-none">{totalFindings}</span>
+                        <span className="text-[9px] text-textMuted uppercase tracking-wider">Findings</span>
+                      </div>
+                    </div>
+                    <div className="flex flex-col space-y-2">
+                      <LegendItem label="Critical" count={severityCounts.Critical} color="bg-[#B91C1C]" />
+                      <LegendItem label="High" count={severityCounts.High} color="bg-[#B45309]" />
+                      <LegendItem label="Medium" count={severityCounts.Medium} color="bg-[#D97706]" />
+                      <LegendItem label="Low" count={severityCounts.Low} color="bg-[#3B82F6]" />
+                    </div>
                   </div>
                 </div>
 
-                {/* FINDINGS TABLE */}
-                <div className="bg-surface border border-border rounded overflow-hidden flex flex-col">
-                  <div className="px-5 py-4 border-b border-border flex items-center justify-between bg-surface">
-                    <h2 className="text-sm font-semibold uppercase tracking-wider text-textMuted flex items-center"><ShieldAlert className="w-4 h-4 mr-2"/> Vulnerability Findings</h2>
-                    <div className="relative">
-                      <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 transform -translate-y-1/2 text-textMuted" />
-                      <input 
-                        type="text" 
-                        placeholder="Filter..." 
-                        className="bg-background border border-border text-xs rounded pl-8 pr-3 py-1.5 focus:outline-none focus:border-[#1D4ED8] text-textMain w-48 transition-colors"
-                      />
+                <div className="bg-surface border border-border rounded p-5 space-y-4">
+                  <h2 className="text-sm font-semibold uppercase tracking-wider text-textMuted flex items-center">Target Information</h2>
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-2">
+                      <div className="p-1.5 bg-background rounded border border-border">
+                        <Link className="w-4 h-4 text-primary" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-bold text-textMain">World Monitor</div>
+                        <div className="text-xs font-mono text-primary bg-primary/10 px-1.5 py-0.5 inline-block rounded border border-primary/20">{targetBaseUrl || 'http://localhost:3000'}</div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-y-3 text-xs pt-2">
+                      <div className="flex flex-col"><span className="text-textMuted text-[10px] uppercase">Branch</span><span className="font-mono text-textMain">main</span></div>
+                      <div className="flex flex-col"><span className="text-textMuted text-[10px] uppercase">Commit</span><span className="font-mono text-textMain">a1b2c3d</span></div>
+                      <div className="col-span-2 flex flex-col"><span className="text-textMuted text-[10px] uppercase">Assessment Type</span><span className="text-textMain font-medium">Synthetic Security Lab / Demo</span></div>
+                      <div className="flex flex-col"><span className="text-textMuted text-[10px] uppercase">Status</span>
+                        <span className="text-textMain font-medium">{assessmentStatus === 'running' ? 'In Progress' : (assessmentStartedAt ? 'Completed' : 'Pending')}</span>
+                      </div>
+                      <div className="flex flex-col"><span className="text-textMuted text-[10px] uppercase">Started At</span>
+                        <span className="text-textMain font-medium">{assessmentStartedAt ? new Date(assessmentStartedAt).toLocaleTimeString() : 'Not Started'}</span>
+                      </div>
                     </div>
                   </div>
-                  
-                  {isLoading ? (
-                    <div className="p-4 space-y-4">
-                      {[1, 2].map(i => (
-                        <div key={i} className="h-10 bg-background rounded animate-pulse w-full"></div>
-                      ))}
-                    </div>
-                  ) : findings.length === 0 ? (
-                    <div className="p-12 text-center">
-                      <ShieldCheck className="w-10 h-10 text-textMuted mx-auto mb-3" />
-                      <p className="text-textMuted text-sm">No findings mapped to current scope.</p>
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs whitespace-nowrap">
-                        <thead className="bg-background/30 text-textMuted">
-                          <tr>
-                            <th className="px-5 py-2.5 font-medium border-b border-border">Severity</th>
-                            <th className="px-5 py-2.5 font-medium border-b border-border w-full">Finding</th>
-                            <th className="px-5 py-2.5 font-medium border-b border-border">Component</th>
-                            <th className="px-5 py-2.5 font-medium border-b border-border">CWE</th>
-                            <th className="px-5 py-2.5 font-medium border-b border-border">CVSS</th>
-                            <th className="px-5 py-2.5 font-medium border-b border-border">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[#E2E8F0]">
-                          {findings.map(finding => (
-                            <tr 
-                              key={finding.id} 
-                              onClick={() => {
-                                setSelectedFinding(finding);
-                                setActiveTab('findings');
-                              }}
-                              className="hover:bg-background cursor-pointer transition-colors group"
-                            >
-                              <td className="px-5 py-3">
-                                <SeverityText severity={finding.severity} />
-                              </td>
-                              <td className="px-5 py-3 font-medium text-textMain truncate max-w-[280px]" title={finding.title}>{finding.title}</td>
-                              <td className="px-5 py-3 font-mono text-textMuted">{finding.affectedComponent || '-'}</td>
-                              <td className="px-5 py-3 text-textMuted">{finding.cwe || '-'}</td>
-                              <td className="px-5 py-3 text-textMuted">{finding.cvssScore?.toFixed(1) || '-'}</td>
-                              <td className="px-5 py-3">
-                                <ValidationStatus success={finding.lastPocSuccess} />
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                </div>
+
+                <div className="flex flex-col space-y-3">
+                  <button 
+                    onClick={startDemoAssessment}
+                    disabled={assessmentStatus === 'running' || assessmentStatus === 'completed'}
+                    className={`w-full py-3 rounded font-bold text-sm tracking-wider uppercase transition-colors flex justify-center items-center ${assessmentStatus === 'running' || assessmentStatus === 'completed' ? 'bg-primary/50 text-white/50 cursor-not-allowed' : 'bg-primary hover:bg-blue-600 text-white'}`}
+                  >
+                    {assessmentStatus === 'running' ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Running...</> : 
+                     assessmentStatus === 'completed' ? <><CheckCircle2 className="w-4 h-4 mr-2" /> Assessment Complete</> : 
+                     assessmentStatus === 'failed' ? <><Play className="w-4 h-4 mr-2" /> Retry Assessment</> : 
+                     <><Play className="w-4 h-4 mr-2" /> Start Demo Assessment</>}
+                  </button>
+                  <button 
+                    disabled={assessmentStatus !== 'completed'}
+                    className={`w-full py-3 rounded font-bold text-sm tracking-wider uppercase transition-colors flex justify-center items-center border ${assessmentStatus !== 'completed' ? 'border-border text-textMuted cursor-not-allowed' : 'border-primary text-primary hover:bg-primary/10'}`}
+                  >
+                    {assessmentStatus !== 'completed' ? 'Complete Assessment First' : 'Run All Demo PoCs'}
+                  </button>
+                  {demoAssessmentStarted && (
+                    <button 
+                      onClick={resetDemo}
+                      className={`w-full py-2 rounded font-bold text-xs tracking-wider uppercase transition-colors flex justify-center items-center border border-red-500/30 text-red-500 hover:bg-red-500/10`}
+                    >
+                      Reset Demo
+                    </button>
                   )}
                 </div>
-
               </div>
 
-              {/* Right Column (1/3 width on LG) */}
-              <div className="space-y-6 flex flex-col">
-                
-                {/* ATTACK SURFACE SECTION */}
+              <div className="lg:col-span-3 space-y-6">
                 <div className="bg-surface border border-border rounded p-5">
-                  <h2 className="text-sm font-semibold uppercase tracking-wider text-textMuted pb-4 flex items-center"><Server className="w-4 h-4 mr-2"/> Attack Surface</h2>
-                  <div className="grid grid-cols-2 gap-3">
-                    <SurfaceStat icon={<Server className="w-4 h-4" />} label="Endpoints" value="Mapped" onClick={() => changeTab('surface')} />
-                    <SurfaceStat icon={<Code className="w-4 h-4" />} label="API Routes" value="Active" onClick={() => changeTab('surface')} />
-                    <SurfaceStat icon={<Box className="w-4 h-4" />} label="Client Modules" value="Tracked" onClick={() => changeTab('surface')} />
-                    <SurfaceStat icon={<Link className="w-4 h-4" />} label="Integrations" value="Configured" onClick={() => changeTab('surface')} />
-                    <SurfaceStat icon={<Shield className="w-4 h-4" />} label="Trust Boundaries" value="Mapped" onClick={() => changeTab('surface')} />
-                    <SurfaceStat icon={<Lock className="w-4 h-4" />} label="Auth Policies" value="Detected" onClick={() => changeTab('surface')} />
-                  </div>
-                </div>
-
-                {/* RISK OVERVIEW */}
-                <div className="bg-surface border border-border rounded p-5">
-                  <h2 className="text-sm font-semibold uppercase tracking-wider text-textMuted pb-4 flex items-center"><BarChartIcon className="w-4 h-4 mr-2"/> Risk Overview</h2>
-                  
-                  <div className="space-y-4 pb-6">
-                    <h3 className="text-xs font-medium text-textMuted">Severity Distribution</h3>
-                    <div className="flex h-2 w-full rounded overflow-hidden bg-background">
-                      <div className="bg-[#B91C1C]" style={{width: `${(severityCounts.Critical / Math.max(1, totalFindings)) * 100}%`}}></div>
-                      <div className="bg-[#B45309]" style={{width: `${(severityCounts.High / Math.max(1, totalFindings)) * 100}%`}}></div>
-                      <div className="bg-[#B45309]" style={{width: `${(severityCounts.Medium / Math.max(1, totalFindings)) * 100}%`}}></div>
-                      <div className="bg-primary" style={{width: `${(severityCounts.Low / Math.max(1, totalFindings)) * 100}%`}}></div>
-                    </div>
-                    <div className="flex justify-between text-[10px] text-textMuted uppercase">
-                      <span>C ({severityCounts.Critical})</span>
-                      <span>H ({severityCounts.High})</span>
-                      <span>M ({severityCounts.Medium})</span>
-                      <span>L ({severityCounts.Low})</span>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <h3 className="text-xs font-medium text-textMuted">Domain Distribution</h3>
-                    {Object.entries(categories).length > 0 ? Object.entries(categories).map(([cat, count]) => (
-                      <div key={cat} className="space-y-1">
-                        <div className="flex justify-between text-[11px] text-textMain capitalize">
-                          <span>{cat}</span>
-                          <span className="text-textMuted">{count}</span>
+                  <h2 className="text-sm font-semibold uppercase tracking-wider text-textMuted pb-4 flex items-center">DEMO SECURITY PIPELINE</h2>
+                  <div className="space-y-4">
+                    {scanners.map((s, idx) => (
+                      <div key={idx} className="flex flex-col space-y-1.5">
+                        <div className="flex justify-between items-center text-xs">
+                          <div className="flex items-center space-x-2">
+                            {s.status === 'COMPLETED' ? <CheckCircle2 className="w-3.5 h-3.5 text-green-500" /> : s.status === 'RUNNING' ? <Loader2 className="w-3.5 h-3.5 text-primary animate-spin" /> : <MinusCircle className="w-3.5 h-3.5 text-textMuted" />}
+                            <span className="font-semibold text-textMain">{s.name}</span>
+                          </div>
+                          <div className="flex items-center space-x-3">
+                            <span className={`text-[10px] font-bold tracking-wider ${s.status === 'COMPLETED' ? 'text-green-500' : s.status === 'RUNNING' ? 'text-primary' : 'text-textMuted'}`}>{s.status}</span>
+                            <span className="text-textMuted font-mono w-8 text-right">{s.progress}%</span>
+                          </div>
                         </div>
-                        <div className="w-full bg-background h-1.5 rounded overflow-hidden">
-                          <div className="bg-primary h-full" style={{width: `${(count / totalFindings) * 100}%`}}></div>
+                        <div className="w-full bg-background h-1.5 rounded-full overflow-hidden">
+                          <div className={`h-full transition-all duration-200 ease-out ${s.status === 'COMPLETED' ? 'bg-green-500' : 'bg-primary'}`} style={{ width: `${s.progress}%` }}></div>
                         </div>
                       </div>
-                    )) : (
-                      <span className="text-xs text-textMuted">No data available</span>
-                    )}
+                    ))}
                   </div>
                 </div>
-
-                {/* RECENT ACTIVITY */}
-                <div className="bg-surface border border-border rounded p-5 flex-1">
-                  <h2 className="text-sm font-semibold uppercase tracking-wider text-textMuted pb-4 flex items-center"><Clock className="w-4 h-4 mr-2"/> Recent Activity</h2>
-                  <div className="space-y-4 relative before:absolute before:inset-0 before:ml-2 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-background pl-6 md:pl-0">
-                    <ActivityItem time="Just now" action="Scan completed" detail="Phase: Target Discovery" />
-                    <ActivityItem time="2m ago" action="Finding discovered" detail="WM-API-001 mapped" />
-                    <ActivityItem time="4m ago" action="Evidence captured" detail="PoC executed successfully" />
-                    <ActivityItem time="1h ago" action="Report generated" detail="System baseline report" />
-                  </div>
-                </div>
-
               </div>
             </div>
+
+            <LiveOutputPanel logs={assessmentLogs} findings={findings} setActiveTab={setActiveTab} setSelectedFinding={setSelectedFinding} />
+
           </div>
+
           )}
         </main>
       </div>
@@ -589,3 +804,144 @@ function BarChartIcon(props: any) {
     </svg>
   );
 }
+
+
+const DonutChart = ({ critical, high, medium, low }: any) => {
+  const total = critical + high + medium + low || 1;
+  let currentOffset = 0;
+  const segments = [
+    { value: critical, color: '#B91C1C' },
+    { value: high, color: '#B45309' },
+    { value: medium, color: '#D97706' },
+    { value: low, color: '#3B82F6' },
+  ];
+  return (
+    <svg viewBox="0 0 36 36" className="w-24 h-24">
+      <circle
+        r="15.91549430918954"
+        cx="18" cy="18"
+        fill="transparent"
+        stroke="#1f2937"
+        strokeWidth="3"
+      />
+      {segments.map((s, i) => {
+        if (s.value === 0) return null;
+        const percentage = (s.value / total) * 100;
+        const strokeDasharray = `${percentage} ${100 - percentage}`;
+        const strokeDashoffset = -currentOffset;
+        currentOffset += percentage;
+        return (
+          <circle
+            key={i}
+            r="15.91549430918954"
+            cx="18" cy="18"
+            fill="transparent"
+            stroke={s.color}
+            strokeWidth="3"
+            strokeDasharray={strokeDasharray}
+            strokeDashoffset={strokeDashoffset}
+            transform="rotate(-90 18 18)"
+          />
+        );
+      })}
+    </svg>
+  );
+};
+
+const LegendItem = ({ label, count, color }: any) => (
+  <div className="flex items-center space-x-2 text-xs">
+    <div className={`w-2 h-2 rounded-full ${color}`}></div>
+    <span className="text-textMuted uppercase tracking-wider w-16">{label}</span>
+    <span className="font-bold text-textMain">{count}</span>
+  </div>
+);
+
+const LiveOutputPanel = ({ logs, findings, setActiveTab, setSelectedFinding }: any) => {
+  const [tab, setTab] = useState<'Logs' | 'Findings' | 'Evidence'>('Logs');
+  
+  return (
+    <div className="bg-surface border border-border rounded flex flex-col h-96 mt-6">
+      <div className="px-5 py-3 border-b border-border flex justify-between items-center bg-background/50">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-textMuted flex items-center"><Terminal className="w-4 h-4 mr-2"/> Live Output</h2>
+        <div className="flex items-center space-x-2 text-[10px] font-bold text-red-500 uppercase tracking-widest animate-pulse">
+           <div className="w-2 h-2 rounded-full bg-red-500"></div>
+           <span>Live</span>
+        </div>
+      </div>
+      <div className="flex border-b border-border text-xs uppercase tracking-wider font-semibold text-textMuted">
+        <button onClick={() => setTab('Logs')} className={`px-5 py-2.5 border-b-2 transition-colors ${tab === 'Logs' ? 'border-primary text-primary bg-primary/5' : 'border-transparent hover:text-textMain'}`}>Logs</button>
+        <button onClick={() => setTab('Findings')} className={`px-5 py-2.5 border-b-2 transition-colors ${tab === 'Findings' ? 'border-primary text-primary bg-primary/5' : 'border-transparent hover:text-textMain'}`}>Findings ({findings.length})</button>
+        <button onClick={() => setTab('Evidence')} className={`px-5 py-2.5 border-b-2 transition-colors ${tab === 'Evidence' ? 'border-primary text-primary bg-primary/5' : 'border-transparent hover:text-textMain'}`}>Evidence</button>
+      </div>
+      <div className="flex-1 overflow-y-auto p-4 bg-[#0a0a0a] font-mono text-xs">
+         {tab === 'Logs' && (
+           <div className="space-y-1">
+             {logs.length === 0 && <div className="text-textMuted italic">Waiting for assessment to start...</div>}
+             {logs.map((log: any, i: number) => (
+               <div key={i} className="flex space-x-3">
+                 <span className="text-textMuted shrink-0">[{log.timestamp.split('T')[1].substring(0,8)}]</span>
+                 <span className={`shrink-0 w-12 ${log.level === 'INFO' ? 'text-blue-400' : log.level === 'WARN' ? 'text-yellow-400' : 'text-red-400'}`}>[{log.level}]</span>
+                 <span className="text-gray-300">{log.message}</span>
+               </div>
+             ))}
+           </div>
+         )}
+         {tab === 'Findings' && (
+           <table className="w-full text-left text-xs whitespace-nowrap">
+             <thead className="text-textMuted border-b border-gray-800">
+               <tr>
+                 <th className="py-2 px-2">Finding ID</th>
+                 <th className="px-2">Title</th>
+                 <th className="px-2">Severity</th>
+                 <th className="px-2">CWE</th>
+                 <th className="px-2">CVSS</th>
+                 <th className="px-2">Status</th>
+               </tr>
+             </thead>
+             <tbody>
+               {findings.map((f: any) => (
+                 <tr key={f.id} onClick={() => { setSelectedFinding(f); setActiveTab('findings'); }} className="cursor-pointer hover:bg-gray-800/50 transition-colors border-b border-gray-900 group">
+                   <td className="py-2 px-2 text-primary">{f.id}</td>
+                   <td className="px-2 text-gray-300 group-hover:text-white truncate max-w-xs">{f.title}</td>
+                   <td className="px-2"><SeverityText severity={f.severity} /></td>
+                   <td className="px-2 text-gray-500">{f.cwe || '-'}</td>
+                   <td className="px-2 text-gray-500">{f.cvssScore?.toFixed(1) || '-'}</td>
+                   <td className="px-2"><ValidationStatus success={f.lastPocSuccess} /></td>
+                 </tr>
+               ))}
+             </tbody>
+           </table>
+         )}
+         {tab === 'Evidence' && (
+           <div className="space-y-6">
+             {findings.filter((f: any) => f.lastPocRunAt).length === 0 && <div className="text-textMuted italic">No evidence generated yet.</div>}
+             {findings.filter((f: any) => f.lastPocRunAt).map((f: any) => (
+               <div key={f.id} className="border border-gray-800 rounded p-3 bg-black">
+                 <div className="flex justify-between items-center mb-2 border-b border-gray-800 pb-2">
+                   <div className="text-primary font-bold">{f.id}</div>
+                   <div className={`px-2 py-0.5 text-[10px] font-bold rounded ${f.lastPocSuccess ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                     PoC: {f.lastPocSuccess ? 'SUCCESS' : 'FAILED'}
+                   </div>
+                 </div>
+                 <div className="grid grid-cols-2 gap-4 text-gray-400">
+                   <div>
+                     <span className="text-gray-500">Timestamp: </span> {new Date(f.lastPocRunAt!).toLocaleString()}
+                   </div>
+                   <div>
+                     <span className="text-gray-500">Target: </span> http://localhost:3000
+                   </div>
+                   <div className="col-span-2">
+                     <span className="text-gray-500 block mb-1">Request/Response Evidence:</span>
+                     <div className="bg-gray-900 p-2 rounded whitespace-pre-wrap font-mono text-[10px] text-gray-300">
+                       {f.pocEvidence || 'No payload details available.'}
+                     </div>
+                   </div>
+                 </div>
+               </div>
+             ))}
+           </div>
+         )}
+      </div>
+    </div>
+  );
+};

@@ -3,23 +3,23 @@ import LandingPage from './components/LandingPage';
 import Dashboard from './components/Dashboard';
 
 export default function App() {
-  const [currentHash, setCurrentHash] = useState(() => window.location.hash || '');
+  const [hasLaunched, setHasLaunched] = useState(false);
 
   useEffect(() => {
-    const handleHashChange = () => {
-      setCurrentHash(window.location.hash);
-    };
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
+    // Clear any stale dashboard hash on initial startup
+    if (window.location.hash.startsWith('#dashboard')) {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
   }, []);
 
   const handleLaunch = () => {
+    setHasLaunched(true);
     window.location.hash = '#dashboard/overview';
   };
 
-  if (currentHash.startsWith('#dashboard')) {
-    return <Dashboard />;
+  if (!hasLaunched) {
+    return <LandingPage onLaunch={handleLaunch} />;
   }
 
-  return <LandingPage onLaunch={handleLaunch} />;
+  return <Dashboard />;
 }
